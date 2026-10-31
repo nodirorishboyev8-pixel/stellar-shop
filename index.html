@@ -109,7 +109,7 @@ $("send").onclick = () => {
   const order = { name, phone, addr,
     items: L.map(c => ({n:c.p.name, s:c.size, q:c.qty, p:c.p.price})),
     total: L.reduce((a,c)=>a+c.qty*c.p.price,0) };
-  if (!tg.initData) { alert("Buyurtma Telegram ichida yuboriladi.\n" + JSON.stringify(order,null,1)); return; }
+  if (!tg.platform || tg.platform === "unknown") { alert("Buyurtma Telegram ichida yuboriladi.\n" + JSON.stringify(order,null,1)); return; }
   tg.sendData(JSON.stringify(order));
 };
 </script>
