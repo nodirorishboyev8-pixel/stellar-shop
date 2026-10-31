@@ -14,7 +14,7 @@ h1{font-size:22px;margin:18px 4px 12px}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 @media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
 .card{background:var(--card);border-radius:14px;overflow:hidden;border:1px solid var(--line);display:flex;flex-direction:column}
-.ph{aspect-ratio:3/4;background:var(--line) center/cover;display:grid;place-items:center;color:var(--mute);font-size:13px}
+.ph{aspect-ratio:1/1;background:var(--line) center/cover;display:grid;place-items:center;color:var(--mute);font-size:13px}
 .info{padding:10px;display:flex;flex-direction:column;gap:8px;flex:1}
 .name{font-weight:600;font-size:15px}
 .price{color:var(--mute);font-size:14px}
@@ -32,6 +32,22 @@ h1{font-size:22px;margin:18px 4px 12px}
 .q{display:flex;align-items:center;gap:8px}
 .q button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px}
 input,textarea{width:100%;margin-top:10px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+.geo{width:100%;margin-top:10px;padding:12px;font-size:15px;text-align:center}
+.geo.on{background:var(--acc);color:var(--on);border-color:var(--acc)}
+.ph{position:relative;cursor:pointer}
+.name{cursor:pointer}
+.cnt{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:2px 8px;border-radius:10px}
+.galw{position:relative}
+.gal{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:14px;scrollbar-width:none}
+.gal::-webkit-scrollbar{display:none}
+.sl{flex:0 0 100%;scroll-snap-align:center;aspect-ratio:1/1;background:var(--line) center/cover;display:grid;place-items:center;color:var(--mute);font-size:13px}
+.nav{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:22px;line-height:1}
+.nav.l{left:8px}.nav.r{right:8px}
+.dots{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.5)}
+.dots i.on{background:#fff}
+.pdn{font-size:20px;font-weight:700;margin:14px 0 2px}
+#pdbody .sizes{margin:10px 0}
 .tot{display:flex;justify-content:space-between;font-weight:700;margin:14px 0 4px}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 </style>
@@ -48,18 +64,21 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
   <input id="name" placeholder="Ismingiz" autocomplete="name">
   <input id="phone" placeholder="Telefon raqamingiz" inputmode="tel" autocomplete="tel">
   <textarea id="addr" rows="2" placeholder="Yetkazib berish manzili"></textarea>
+  <button class="sz geo" id="geo" type="button">📍 Joylashuvni belgilash (ixtiyoriy)</button>
   <button class="btn" id="send" style="margin-top:14px">Buyurtma berish</button>
   <button class="sz" id="close" style="width:100%;margin-top:10px;padding:10px">Davom etish</button>
 </div></div>
 
+<div class="sheet" id="pd"><div class="panel" id="pdbody"></div></div>
+
 <script>
 // ====== MAHSULOTLAR: shu yerni o'zingiznikiga almashtiring ======
-// img: rasm havolasi (https://...). Bo'sh qoldirsangiz, rasm o'rnida yozuv chiqadi.
+// imgs: rasmlar ro'yxati, masalan imgs:["a1.jpg","a2.jpg","a3.jpg"]. Birinchisi kartada ko'rinadi,
+// mahsulot bosilganda hammasi surib ko'riladi. Bo'sh qoldirsangiz (imgs:[]), yozuv chiqadi.
 const PRODUCTS = [
-  {id:1, name:"Oversize futbolka", price:120000, sizes:["S","M","L","XL"], img:""},
-  {id:2, name:"Baggy jinsi (qora)", price:280000, sizes:["28","30","32","34"], img:"baggy-jeans.jpg"},
-  {id:3, name:"Ayollar ko'ylagi", price:240000, sizes:["S","M","L"], img:""},
-  {id:4, name:"Qishki kurtka", price:650000, sizes:["M","L","XL"], img:""},
+  {id:1, name:"Sviter (kulrang)", price:119000, sizes:["M","L","XL","2XL","3XL"], imgs:["sviter.jpg"]},
+  {id:2, name:"Baggy jinsi (qora)", price:139000, sizes:["S","M","L","XL","2XL"], imgs:["baggy-jeans.jpg"]},
+  {id:3, name:"Krossovka", price:165000, sizes:["35","36","37","38","39","40","41","42","43","44"], imgs:["krossovka-1.jpg","krossovka-2.jpg"]},
 ];
 // =================================================================
 
@@ -67,11 +86,33 @@ const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("ru-RU") + " so'm";
 const picked = {}, cart = {};
+let loc = null;
+const gallery = p => p.imgs && p.imgs.length ? p.imgs : (p.img ? [p.img] : []);
+function setSize(id, s){ picked[id] = s;
+  document.querySelectorAll(`.sizes[data-p="${id}"] .sz`).forEach(b => b.classList.toggle("on", b.dataset.s === s)); }
+function add(id){ const size = picked[id], k = id + "|" + size;
+  cart[k] = cart[k] || {id, size, qty:0}; cart[k].qty++; tg.HapticFeedback?.impactOccurred("light"); draw(); }
+function closePd(){ $("pd").classList.remove("open"); }
+function openPd(id){
+  const p = PRODUCTS.find(x => x.id === id), g = gallery(p);
+  $("pdbody").innerHTML = `<div class="galw"><div class="gal" id="gal">${(g.length ? g : [""]).map(u =>
+      `<div class="sl" ${u ? `style="background-image:url('${u}')"` : ""}>${u ? "" : "Rasm"}</div>`).join("")}</div>
+    ${g.length > 1 ? `<button class="nav l" data-d="-1">‹</button><button class="nav r" data-d="1">›</button>
+    <div class="dots" id="dots">${g.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div>` : ""}</div>
+    <div class="pdn">${p.name}</div><div class="price">${fmt(p.price)}</div>
+    <div class="sizes" data-p="${p.id}">${p.sizes.map(z => `<button class="sz${z === picked[p.id] ? " on" : ""}" data-s="${z}">${z}</button>`).join("")}</div>
+    <button class="btn" data-addpd="${p.id}" style="margin-top:14px">Savatga</button>
+    <button class="sz" id="pdclose" style="width:100%;margin-top:10px;padding:10px">Yopish</button>`;
+  const gal = $("gal");
+  if (g.length > 1) gal.onscroll = () => { const i = Math.round(gal.scrollLeft / gal.clientWidth);
+    document.querySelectorAll("#dots i").forEach((d, j) => d.classList.toggle("on", j === i)); };
+  $("pdbody").scrollTop = 0; $("pd").classList.add("open");
+}
 
 $("grid").innerHTML = PRODUCTS.map(p => {
-  picked[p.id] = p.sizes[0];
-  return `<div class="card">
-    <div class="ph" ${p.img ? `style="background-image:url('${p.img}')"` : ""}>${p.img ? "" : "Rasm"}</div>
+  picked[p.id] = p.sizes[0]; const g = gallery(p);
+  return `<div class="card" data-id="${p.id}">
+    <div class="ph" ${g[0] ? `style="background-image:url('${g[0]}')"` : ""}>${g[0] ? "" : "Rasm"}${g.length > 1 ? `<span class="cnt">📷 ${g.length}</span>` : ""}</div>
     <div class="info"><div class="name">${p.name}</div><div class="price">${fmt(p.price)}</div>
     <div class="sizes" data-p="${p.id}">${p.sizes.map((s,i)=>`<button class="sz${i?"":" on"}" data-s="${s}">${s}</button>`).join("")}</div>
     <button class="btn" data-add="${p.id}">Savatga</button></div></div>`;
@@ -79,12 +120,22 @@ $("grid").innerHTML = PRODUCTS.map(p => {
 
 $("grid").onclick = e => {
   const s = e.target.closest(".sz");
-  if (s) { const box = s.parentElement; picked[box.dataset.p] = s.dataset.s;
-    box.querySelectorAll(".sz").forEach(b => b.classList.toggle("on", b === s)); return; }
+  if (s) { setSize(s.parentElement.dataset.p, s.dataset.s); return; }
   const a = e.target.closest("[data-add]");
-  if (a) { const id = +a.dataset.add, size = picked[id], k = id + "|" + size;
-    cart[k] = cart[k] || {id, size, qty:0}; cart[k].qty++; tg.HapticFeedback?.impactOccurred("light"); draw(); }
+  if (a) { add(+a.dataset.add); return; }
+  const c = e.target.closest(".ph,.name");
+  if (c) openPd(+c.closest(".card").dataset.id);
 };
+$("pdbody").onclick = e => {
+  const s = e.target.closest(".sz[data-s]");
+  if (s) { setSize(s.parentElement.dataset.p, s.dataset.s); return; }
+  const n = e.target.closest(".nav");
+  if (n) { const g = $("gal"); g.scrollBy({left: +n.dataset.d * g.clientWidth, behavior:"smooth"}); return; }
+  const a = e.target.closest("[data-addpd]");
+  if (a) { add(+a.dataset.addpd); closePd(); return; }
+  if (e.target.closest("#pdclose")) closePd();
+};
+$("pd").onclick = e => { if (e.target === $("pd")) closePd(); };
 
 function lines(){ return Object.values(cart).filter(c=>c.qty>0).map(c=>({...c, p:PRODUCTS.find(x=>x.id===c.id)})); }
 function draw(){
@@ -102,13 +153,27 @@ $("items").onclick = e => {
 $("open").onclick = () => $("sheet").classList.add("open");
 $("close").onclick = () => $("sheet").classList.remove("open");
 
+$("geo").onclick = () => {
+  const ok = (la, lo) => { loc = {lat:+la.toFixed(6), lon:+lo.toFixed(6)};
+    $("geo").textContent = "📍 Joylashuv belgilandi ✓"; $("geo").classList.add("on"); };
+  const fail = () => tg.showAlert("Joylashuvni olib bo'lmadi. Buyurtmadan keyin bot lokatsiya yuborishni so'raydi.");
+  const lm = tg.LocationManager;
+  if (lm) lm.init(() => {
+    if (!lm.isLocationAvailable) return fail();
+    lm.getLocation(d => d ? ok(d.latitude, d.longitude) : fail());
+  });
+  else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
+    p => ok(p.coords.latitude, p.coords.longitude), fail, {enableHighAccuracy:true, timeout:10000});
+  else fail();
+};
+
 $("send").onclick = () => {
   const L = lines(), name = $("name").value.trim(), phone = $("phone").value.trim(), addr = $("addr").value.trim();
   if (!L.length) return;
   if (!name || phone.length < 7 || !addr) { tg.showAlert("Ism, telefon va manzilni to'ldiring."); return; }
   const order = { name, phone, addr,
     items: L.map(c => ({n:c.p.name, s:c.size, q:c.qty, p:c.p.price})),
-    total: L.reduce((a,c)=>a+c.qty*c.p.price,0) };
+    total: L.reduce((a,c)=>a+c.qty*c.p.price,0), loc };
   if (!tg.platform || tg.platform === "unknown") { alert("Buyurtma Telegram ichida yuboriladi.\n" + JSON.stringify(order,null,1)); return; }
   tg.sendData(JSON.stringify(order));
 };
