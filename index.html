@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kiyim do'koni</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#f3f4f2;--card:#fff;--ink:#18211d;--mute:#69726d;--acc:#1f5d50;--on:#fff;--line:#dfe3e0}
+@media(prefers-color-scheme:dark){:root{--bg:#121513;--card:#1b201d;--ink:#eef2ef;--mute:#99a39d;--acc:#5fb59f;--on:#0e1a16;--line:#2c332f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif;padding:0 12px 96px}
+h1{font-size:22px;margin:18px 4px 12px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card{background:var(--card);border-radius:14px;overflow:hidden;border:1px solid var(--line);display:flex;flex-direction:column}
+.ph{aspect-ratio:3/4;background:var(--line) center/cover;display:grid;place-items:center;color:var(--mute);font-size:13px}
+.info{padding:10px;display:flex;flex-direction:column;gap:8px;flex:1}
+.name{font-weight:600;font-size:15px}
+.price{color:var(--mute);font-size:14px}
+.sizes{display:flex;flex-wrap:wrap;gap:6px}
+.sz{border:1px solid var(--line);background:none;color:var(--ink);border-radius:8px;padding:4px 9px;font-size:13px}
+.sz.on{background:var(--acc);color:var(--on);border-color:var(--acc)}
+.btn{border:0;background:var(--acc);color:var(--on);border-radius:10px;padding:11px;font-size:15px;font-weight:600;width:100%;margin-top:auto}
+.bar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:none}
+.bar .btn{display:flex;justify-content:space-between;padding:14px 16px}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end}
+.sheet.open{display:flex}
+.panel{background:var(--bg);width:100%;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row .t{flex:1;font-size:15px}.row small{color:var(--mute);display:block}
+.q{display:flex;align-items:center;gap:8px}
+.q button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px}
+input,textarea{width:100%;margin-top:10px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+.tot{display:flex;justify-content:space-between;font-weight:700;margin:14px 0 4px}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+</style>
+</head>
+<body>
+<h1>Kiyim do'koni</h1>
+<div class="grid" id="grid"></div>
+
+<div class="bar" id="bar"><button class="btn" id="open"><span id="cnt"></span><span id="sum"></span></button></div>
+
+<div class="sheet" id="sheet"><div class="panel">
+  <div id="items"></div>
+  <div class="tot"><span>Jami</span><span id="tot"></span></div>
+  <input id="name" placeholder="Ismingiz" autocomplete="name">
+  <input id="phone" placeholder="Telefon raqamingiz" inputmode="tel" autocomplete="tel">
+  <textarea id="addr" rows="2" placeholder="Yetkazib berish manzili"></textarea>
+  <button class="btn" id="send" style="margin-top:14px">Buyurtma berish</button>
+  <button class="sz" id="close" style="width:100%;margin-top:10px;padding:10px">Davom etish</button>
+</div></div>
+
+<script>
+// ====== MAHSULOTLAR: shu yerni o'zingiznikiga almashtiring ======
+// img: rasm havolasi (https://...). Bo'sh qoldirsangiz, rasm o'rnida yozuv chiqadi.
+const PRODUCTS = [
+  {id:1, name:"Oversize futbolka", price:120000, sizes:["S","M","L","XL"], img:""},
+  {id:2, name:"Jinsi shim", price:280000, sizes:["28","30","32","34"], img:""},
+  {id:3, name:"Ayollar ko'ylagi", price:240000, sizes:["S","M","L"], img:""},
+  {id:4, name:"Qishki kurtka", price:650000, sizes:["M","L","XL"], img:""},
+];
+// =================================================================
+
+const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("ru-RU") + " so'm";
+const picked = {}, cart = {};
+
+$("grid").innerHTML = PRODUCTS.map(p => {
+  picked[p.id] = p.sizes[0];
+  return `<div class="card">
+    <div class="ph" ${p.img ? `style="background-image:url('${p.img}')"` : ""}>${p.img ? "" : "Rasm"}</div>
+    <div class="info"><div class="name">${p.name}</div><div class="price">${fmt(p.price)}</div>
+    <div class="sizes" data-p="${p.id}">${p.sizes.map((s,i)=>`<button class="sz${i?"":" on"}" data-s="${s}">${s}</button>`).join("")}</div>
+    <button class="btn" data-add="${p.id}">Savatga</button></div></div>`;
+}).join("");
+
+$("grid").onclick = e => {
+  const s = e.target.closest(".sz");
+  if (s) { const box = s.parentElement; picked[box.dataset.p] = s.dataset.s;
+    box.querySelectorAll(".sz").forEach(b => b.classList.toggle("on", b === s)); return; }
+  const a = e.target.closest("[data-add]");
+  if (a) { const id = +a.dataset.add, size = picked[id], k = id + "|" + size;
+    cart[k] = cart[k] || {id, size, qty:0}; cart[k].qty++; tg.HapticFeedback?.impactOccurred("light"); draw(); }
+};
+
+function lines(){ return Object.values(cart).filter(c=>c.qty>0).map(c=>({...c, p:PRODUCTS.find(x=>x.id===c.id)})); }
+function draw(){
+  const L = lines(), n = L.reduce((a,c)=>a+c.qty,0), t = L.reduce((a,c)=>a+c.qty*c.p.price,0);
+  $("bar").style.display = n ? "block" : "none";
+  $("cnt").textContent = "Savat: " + n + " ta"; $("sum").textContent = fmt(t); $("tot").textContent = fmt(t);
+  $("items").innerHTML = L.map(c=>`<div class="row"><div class="t">${c.p.name}<small>O'lcham: ${c.size} · ${fmt(c.p.price)}</small></div>
+    <div class="q"><button data-m="${c.id}|${c.size}">−</button><b>${c.qty}</b><button data-pl="${c.id}|${c.size}">+</button></div></div>`).join("");
+  if (!n) $("sheet").classList.remove("open");
+}
+$("items").onclick = e => {
+  const m = e.target.dataset.m, p = e.target.dataset.pl;
+  if (m) cart[m].qty--; if (p) cart[p].qty++; draw();
+};
+$("open").onclick = () => $("sheet").classList.add("open");
+$("close").onclick = () => $("sheet").classList.remove("open");
+
+$("send").onclick = () => {
+  const L = lines(), name = $("name").value.trim(), phone = $("phone").value.trim(), addr = $("addr").value.trim();
+  if (!L.length) return;
+  if (!name || phone.length < 7 || !addr) { tg.showAlert("Ism, telefon va manzilni to'ldiring."); return; }
+  const order = { name, phone, addr,
+    items: L.map(c => ({n:c.p.name, s:c.size, q:c.qty, p:c.p.price})),
+    total: L.reduce((a,c)=>a+c.qty*c.p.price,0) };
+  if (!tg.initData) { alert("Buyurtma Telegram ichida yuboriladi.\n" + JSON.stringify(order,null,1)); return; }
+  tg.sendData(JSON.stringify(order));
+};
+</script>
+</body>
+</html>
