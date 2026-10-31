@@ -28,7 +28,7 @@ from telegram.ext import (
 )
 
 # ===== SHU 4 QATORNI O'ZINGIZNIKIGA ALMASHTIRING =====
-TOKEN = "TOKENNI_SHU_YERGA_QOYING"
+TOKEN = "9167660799:AAEYHDGc84NzUmJyLe1fOR11ZU2r63X_gFM"
 ADMIN_ID = 5764255493
 WEBAPP_URL = "https://nodirorishboyev8-pixel.github.io/stellar-shop/"
 CARD = "4073 4200 6189 7157 (Nodir O'rishboyev)"
